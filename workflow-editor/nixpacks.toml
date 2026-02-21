@@ -1,0 +1,9 @@
+[phases.build]
+cmds = [
+  "pnpm build",
+  "cp -r apps/web/public apps/web/.next/standalone/apps/web/public",
+  "cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static"
+]
+
+[start]
+cmd = "cd apps/web/.next/standalone && HOSTNAME=0.0.0.0 node apps/web/server.js"
