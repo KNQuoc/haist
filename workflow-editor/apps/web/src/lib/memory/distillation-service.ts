@@ -14,8 +14,6 @@ const DAILY_PREFIX = 'Daily — ';
 
 /**
  * Run distillation for a specific user.
- * Reads daily artifacts from the last N days, extracts key insights,
- * and adds them to the soul artifact.
  */
 export async function distillMemory(userId: string, daysBack = 3): Promise<{
   success: boolean;
@@ -24,16 +22,13 @@ export async function distillMemory(userId: string, daysBack = 3): Promise<{
   error?: string;
 }> {
   try {
-    // Get all user artifacts
     const allArtifacts = await artifactService.getByUserId(userId);
 
-    // Find the soul artifact
     const soulArtifact = allArtifacts.find((a) => a.title === PROFILE_TITLE);
     if (!soulArtifact) {
       return { success: true, dailiesReviewed: 0, insightsAdded: 0 };
     }
 
-    // Find recent daily artifacts
     const now = new Date();
     const dailyArtifacts = [];
     for (let i = 0; i < daysBack; i++) {
@@ -50,7 +45,6 @@ export async function distillMemory(userId: string, daysBack = 3): Promise<{
       return { success: true, dailiesReviewed: 0, insightsAdded: 0 };
     }
 
-    // Load entries from all daily artifacts
     const dailyEntries: string[] = [];
     for (const daily of dailyArtifacts) {
       const withEntries = await artifactService.getWithEntries(daily.id);
@@ -65,7 +59,6 @@ export async function distillMemory(userId: string, daysBack = 3): Promise<{
       return { success: true, dailiesReviewed: dailyArtifacts.length, insightsAdded: 0 };
     }
 
-    // Load current soul artifact content for context
     const soulWithEntries = await artifactService.getWithEntries(soulArtifact.id);
     const existingSoulContent = soulWithEntries
       ? soulWithEntries.entries
@@ -75,7 +68,6 @@ export async function distillMemory(userId: string, daysBack = 3): Promise<{
           .join('\n')
       : '';
 
-    // Use AI to distill insights
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const response = await openai.chat.completions.create({
@@ -122,7 +114,6 @@ Example output: ["User is traveling to SFO Feb 20-24 for a conference", "Prefers
       return { success: true, dailiesReviewed: dailyArtifacts.length, insightsAdded: 0 };
     }
 
-    // Add each insight to the soul artifact
     let added = 0;
     for (const insight of insights) {
       if (typeof insight === 'string' && insight.trim()) {
@@ -148,33 +139,14 @@ Example output: ["User is traveling to SFO Feb 20-24 for a conference", "Prefers
 
 /**
  * Run distillation for all users who have daily artifacts.
+ * Note: Without pg, we can't easily query all unique userIds.
+ * This would need a Convex query or be called per-user.
  */
 export async function distillAllUsers(): Promise<{
   usersProcessed: number;
   totalInsights: number;
   errors: string[];
 }> {
-  // Get all unique user IDs that have daily artifacts
-  // We'll query artifacts with the daily prefix pattern
-  const { pool } = await import('@/lib/db');
-
-  const result = await pool.query(
-    `SELECT DISTINCT user_id FROM artifacts WHERE title LIKE $1`,
-    [`${DAILY_PREFIX}%`]
-  );
-
-  const userIds: string[] = result.rows.map((r: Record<string, string>) => r.user_id || r['userId']);
-  let totalInsights = 0;
-  const errors: string[] = [];
-
-  for (const userId of userIds) {
-    const outcome = await distillMemory(userId);
-    if (outcome.success) {
-      totalInsights += outcome.insightsAdded;
-    } else if (outcome.error) {
-      errors.push(`User ${userId}: ${outcome.error}`);
-    }
-  }
-
-  return { usersProcessed: userIds.length, totalInsights, errors };
+  console.warn('distillAllUsers: requires a Convex query to list all user IDs with daily artifacts. Not yet implemented.');
+  return { usersProcessed: 0, totalInsights: 0, errors: [] };
 }

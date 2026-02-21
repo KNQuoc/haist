@@ -1,208 +1,107 @@
 /**
- * PostgreSQL storage for execution logs
- *
- * SQL Migration:
- *
- * -- Supabase (snake_case):
- * CREATE TABLE execution_log (
- *   id TEXT PRIMARY KEY,
- *   rule_id TEXT NOT NULL,
- *   rule_name TEXT NOT NULL,
- *   user_id TEXT NOT NULL,
- *   trigger_slug TEXT NOT NULL,
- *   status TEXT NOT NULL CHECK (status IN ('success', 'failure', 'partial')),
- *   steps_json JSONB,
- *   output_text TEXT,
- *   error_text TEXT,
- *   duration_ms INTEGER,
- *   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
- * );
- * CREATE INDEX idx_execution_log_user_id ON execution_log(user_id);
- * CREATE INDEX idx_execution_log_rule_id ON execution_log(rule_id);
- * CREATE INDEX idx_execution_log_created_at ON execution_log(created_at);
- *
- * -- Local Docker (PascalCase):
- * CREATE TABLE "ExecutionLog" (
- *   id TEXT PRIMARY KEY,
- *   "ruleId" TEXT NOT NULL,
- *   "ruleName" TEXT NOT NULL,
- *   "userId" TEXT NOT NULL,
- *   "triggerSlug" TEXT NOT NULL,
- *   status TEXT NOT NULL CHECK (status IN ('success', 'failure', 'partial')),
- *   "stepsJson" JSONB,
- *   "outputText" TEXT,
- *   "errorText" TEXT,
- *   "durationMs" INTEGER,
- *   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
- * );
- * CREATE INDEX "idx_ExecutionLog_userId" ON "ExecutionLog"("userId");
- * CREATE INDEX "idx_ExecutionLog_ruleId" ON "ExecutionLog"("ruleId");
- * CREATE INDEX "idx_ExecutionLog_createdAt" ON "ExecutionLog"("createdAt");
+ * Convex storage for execution logs
  */
 
-import { pool } from '@/lib/db';
+import { convex, api } from '@/lib/convex';
 import type { ExecutionLogEntry, ExecutionLogStats } from './types';
+import type { Id } from '../../../convex/_generated/dataModel';
 
-const isSupabase = !!process.env.DATABASE_URL;
-const LOG_TABLE = isSupabase ? 'execution_log' : '"ExecutionLog"';
-
-const col = {
-  ruleId: isSupabase ? 'rule_id' : '"ruleId"',
-  ruleName: isSupabase ? 'rule_name' : '"ruleName"',
-  userId: isSupabase ? 'user_id' : '"userId"',
-  triggerSlug: isSupabase ? 'trigger_slug' : '"triggerSlug"',
-  stepsJson: isSupabase ? 'steps_json' : '"stepsJson"',
-  outputText: isSupabase ? 'output_text' : '"outputText"',
-  errorText: isSupabase ? 'error_text' : '"errorText"',
-  durationMs: isSupabase ? 'duration_ms' : '"durationMs"',
-  createdAt: isSupabase ? 'created_at' : '"createdAt"',
-};
-
-function mapLogRow(row: Record<string, unknown>): ExecutionLogEntry {
-  const ruleId = row.ruleId || row.rule_id;
-  const ruleName = row.ruleName || row.rule_name;
-  const userId = row.userId || row.user_id;
-  const triggerSlug = row.triggerSlug || row.trigger_slug;
-  const stepsJson = row.stepsJson || row.steps_json;
-  const outputText = row.outputText || row.output_text;
-  const errorText = row.errorText || row.error_text;
-  const durationMs = row.durationMs ?? row.duration_ms;
-  const createdAt = row.createdAt || row.created_at;
-
-  return {
-    id: row.id as string,
-    ruleId: ruleId as string,
-    ruleName: ruleName as string,
-    userId: userId as string,
-    triggerSlug: triggerSlug as string,
-    status: row.status as 'success' | 'failure' | 'partial',
-    stepsJson: (stepsJson as ExecutionLogEntry['stepsJson']) || [],
-    outputText: (outputText as string) || undefined,
-    errorText: (errorText as string) || undefined,
-    durationMs: (durationMs as number) || undefined,
-    createdAt: createdAt instanceof Date ? createdAt.toISOString() : String(createdAt),
-  };
+function toISO(ts?: number | null): string {
+  return ts ? new Date(ts).toISOString() : new Date().toISOString();
 }
 
-function generateId(): string {
-  const timestamp = Date.now().toString(36);
-  const randomPart = Math.random().toString(36).substring(2, 15);
-  return `log_${timestamp}${randomPart}`;
+function mapDoc(doc: Record<string, unknown>): ExecutionLogEntry {
+  return {
+    id: doc._id as string,
+    ruleId: doc.ruleId as string,
+    ruleName: doc.ruleName as string,
+    userId: doc.userId as string,
+    triggerSlug: (doc.triggerSlug as string) || '',
+    status: doc.status as 'success' | 'failure' | 'partial',
+    stepsJson: (doc.stepsJson as ExecutionLogEntry['stepsJson']) || [],
+    outputText: (doc.outputText as string) || undefined,
+    errorText: (doc.errorText as string) || undefined,
+    durationMs: (doc.durationMs as number) || undefined,
+    createdAt: toISO(doc.createdAt as number),
+  };
 }
 
 export const executionLogStorage = {
   async create(log: Omit<ExecutionLogEntry, 'id' | 'createdAt'>): Promise<ExecutionLogEntry> {
-    const id = generateId();
-    await pool.query(
-      `INSERT INTO ${LOG_TABLE}
-       (id, ${col.ruleId}, ${col.ruleName}, ${col.userId}, ${col.triggerSlug},
-        status, ${col.stepsJson}, ${col.outputText}, ${col.errorText}, ${col.durationMs}, ${col.createdAt})
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
-      [
-        id,
-        log.ruleId,
-        log.ruleName,
-        log.userId,
-        log.triggerSlug,
-        log.status,
-        JSON.stringify(log.stepsJson || []),
-        log.outputText || null,
-        log.errorText || null,
-        log.durationMs || null,
-      ]
-    );
+    const id = await convex.mutation(api.executionLogs.create, {
+      ruleId: log.ruleId as Id<"execution_rules">,
+      ruleName: log.ruleName,
+      userId: log.userId,
+      triggerSlug: log.triggerSlug || undefined,
+      status: log.status,
+      stepsJson: log.stepsJson || [],
+      outputText: log.outputText || undefined,
+      errorText: log.errorText || undefined,
+      durationMs: log.durationMs || undefined,
+    });
 
-    const result = await pool.query(`SELECT * FROM ${LOG_TABLE} WHERE id = $1`, [id]);
-    return mapLogRow(result.rows[0]);
+    return {
+      id: id as string,
+      ruleId: log.ruleId,
+      ruleName: log.ruleName,
+      userId: log.userId,
+      triggerSlug: log.triggerSlug,
+      status: log.status,
+      stepsJson: log.stepsJson || [],
+      outputText: log.outputText,
+      errorText: log.errorText,
+      durationMs: log.durationMs,
+      createdAt: new Date().toISOString(),
+    };
   },
 
   async getByRuleId(ruleId: string, limit = 50, offset = 0): Promise<{ logs: ExecutionLogEntry[]; total: number }> {
-    const countResult = await pool.query(
-      `SELECT COUNT(*) FROM ${LOG_TABLE} WHERE ${col.ruleId} = $1`,
-      [ruleId]
-    );
-    const total = parseInt(countResult.rows[0].count, 10);
-
-    const result = await pool.query(
-      `SELECT * FROM ${LOG_TABLE} WHERE ${col.ruleId} = $1 ORDER BY ${col.createdAt} DESC LIMIT $2 OFFSET $3`,
-      [ruleId, limit, offset]
-    );
-
-    return { logs: result.rows.map(mapLogRow), total };
+    const docs = await convex.query(api.executionLogs.listByRule, {
+      ruleId: ruleId as Id<"execution_rules">,
+    });
+    const total = docs.length;
+    const sliced = docs.slice(offset, offset + limit);
+    return { logs: sliced.map(mapDoc), total };
   },
 
   async getByUserId(userId: string, limit = 50, offset = 0): Promise<{ logs: ExecutionLogEntry[]; total: number }> {
-    const countResult = await pool.query(
-      `SELECT COUNT(*) FROM ${LOG_TABLE} WHERE ${col.userId} = $1`,
-      [userId]
-    );
-    const total = parseInt(countResult.rows[0].count, 10);
-
-    const result = await pool.query(
-      `SELECT * FROM ${LOG_TABLE} WHERE ${col.userId} = $1 ORDER BY ${col.createdAt} DESC LIMIT $2 OFFSET $3`,
-      [userId, limit, offset]
-    );
-
-    return { logs: result.rows.map(mapLogRow), total };
+    const docs = await convex.query(api.executionLogs.list, { userId });
+    const total = docs.length;
+    const sliced = docs.slice(offset, offset + limit);
+    return { logs: sliced.map(mapDoc), total };
   },
 
   async getRecent(userId: string, limit = 10): Promise<ExecutionLogEntry[]> {
-    const result = await pool.query(
-      `SELECT * FROM ${LOG_TABLE} WHERE ${col.userId} = $1 ORDER BY ${col.createdAt} DESC LIMIT $2`,
-      [userId, limit]
-    );
-    return result.rows.map(mapLogRow);
+    const docs = await convex.query(api.executionLogs.list, { userId, limit });
+    return docs.map(mapDoc);
   },
 
-  async deleteOlderThan(days: number): Promise<number> {
-    const result = await pool.query(
-      `DELETE FROM ${LOG_TABLE} WHERE ${col.createdAt} < NOW() - INTERVAL '1 day' * $1 RETURNING id`,
-      [days]
-    );
-    return result.rows.length;
+  async deleteOlderThan(_days: number): Promise<number> {
+    console.warn('TODO: implement deleteOlderThan in Convex');
+    return 0;
   },
 
   async getStats(userId: string): Promise<ExecutionLogStats> {
-    const result = await pool.query(
-      `SELECT
-         COUNT(*) as total_runs,
-         COUNT(*) FILTER (WHERE status = 'success') as success_count,
-         AVG(${col.durationMs}) as avg_duration_ms
-       FROM ${LOG_TABLE}
-       WHERE ${col.userId} = $1`,
-      [userId]
-    );
-
-    const row = result.rows[0];
-    const totalRuns = parseInt(row.total_runs, 10) || 0;
-    const successCount = parseInt(row.success_count, 10) || 0;
-
+    const s = await convex.query(api.executionLogs.stats, { userId });
     return {
-      totalRuns,
-      successRate: totalRuns > 0 ? (successCount / totalRuns) * 100 : 0,
-      avgDurationMs: row.avg_duration_ms ? Math.round(parseFloat(row.avg_duration_ms)) : 0,
+      totalRuns: s.total,
+      successRate: s.total > 0 ? (s.success / s.total) * 100 : 0,
+      avgDurationMs: Math.round(s.avgDuration),
     };
   },
 
   async getStatsByRuleId(ruleId: string): Promise<ExecutionLogStats> {
-    const result = await pool.query(
-      `SELECT
-         COUNT(*) as total_runs,
-         COUNT(*) FILTER (WHERE status = 'success') as success_count,
-         AVG(${col.durationMs}) as avg_duration_ms
-       FROM ${LOG_TABLE}
-       WHERE ${col.ruleId} = $1`,
-      [ruleId]
-    );
-
-    const row = result.rows[0];
-    const totalRuns = parseInt(row.total_runs, 10) || 0;
-    const successCount = parseInt(row.success_count, 10) || 0;
-
+    // Convex doesn't have a per-rule stats query; compute client-side
+    const { logs } = await this.getByRuleId(ruleId, 10000, 0);
+    const total = logs.length;
+    const success = logs.filter(l => l.status === 'success').length;
+    const avgMs = total > 0
+      ? logs.reduce((sum, l) => sum + (l.durationMs || 0), 0) / total
+      : 0;
     return {
-      totalRuns,
-      successRate: totalRuns > 0 ? (successCount / totalRuns) * 100 : 0,
-      avgDurationMs: row.avg_duration_ms ? Math.round(parseFloat(row.avg_duration_ms)) : 0,
+      totalRuns: total,
+      successRate: total > 0 ? (success / total) * 100 : 0,
+      avgDurationMs: Math.round(avgMs),
     };
   },
 };
