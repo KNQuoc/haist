@@ -1,0 +1,15 @@
+diff --git a/dist/openaiChatCompletionsModel.mjs b/dist/openaiChatCompletionsModel.mjs
+index 1234567..abcdefg 100644
+--- a/dist/openaiChatCompletionsModel.mjs
++++ b/dist/openaiChatCompletionsModel.mjs
+@@ -53,7 +53,9 @@
+             if (message.content !== undefined &&
+                 message.content !== null &&
+                 // Azure OpenAI returns empty string instead of null for tool calls, causing parser rejection
+-                !(message.tool_calls && message.content === '')) {
++                !(message.tool_calls && message.content === '') &&
++                // MiniMax (and other providers) return content with <think> tags alongside tool_calls
++                !message.tool_calls) {
+                 const { content, ...rest } = message;
+                 output.push({
+                     id: response.id,

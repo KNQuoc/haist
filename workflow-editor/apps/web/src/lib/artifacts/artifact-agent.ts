@@ -6,6 +6,7 @@
  */
 
 import OpenAI from 'openai';
+import { getMinimaxClient } from '../minimax-model';
 import { artifactService } from './artifact-service';
 import {
   generateEmbedding,
@@ -24,14 +25,8 @@ let openaiClient: OpenAI | null = null;
 function getOpenAIClient(): OpenAI | null {
   if (openaiClient) return openaiClient;
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    console.warn('OPENAI_API_KEY not configured for artifact agent');
-    return null;
-  }
-
   try {
-    openaiClient = new OpenAI({ apiKey });
+    openaiClient = getMinimaxClient();
     return openaiClient;
   } catch (error) {
     console.error('Failed to initialize OpenAI client:', error);
@@ -54,7 +49,7 @@ async function extractContext(output: WorkflowOutput): Promise<string | null> {
     const outputSummary = buildOutputSummary(output);
 
     const response = await client.chat.completions.create({
-      model: 'gpt-5-nano-2025-08-07',
+      model: process.env.MINIMAX_MODEL || 'MiniMax-M2.5',
       messages: [
         {
           role: 'system',
@@ -147,7 +142,7 @@ async function generateTitle(content: string): Promise<string> {
 
   try {
     const response = await client.chat.completions.create({
-      model: 'gpt-5-nano-2025-08-07',
+      model: process.env.MINIMAX_MODEL || 'MiniMax-M2.5',
       messages: [
         {
           role: 'system',
@@ -221,7 +216,7 @@ Provide a comprehensive summary (1-2 paragraphs, 4-8 sentences) that:
 - Highlights actionable items or important takeaways`;
 
     const response = await client.chat.completions.create({
-      model: 'gpt-5-nano-2025-08-07',
+      model: process.env.MINIMAX_MODEL || 'MiniMax-M2.5',
       messages: [
         {
           role: 'system',

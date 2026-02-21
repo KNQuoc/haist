@@ -7,6 +7,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
+import { getMinimaxClient } from '../minimax-model';
 import type { AIAssistantContext, ChatMessage, AIResponse } from './types';
 import { buildContextForAI } from './bubble-context-builder';
 import { getSystemPromptWithContext } from './prompts';
@@ -68,14 +69,8 @@ export class WorkflowAIService {
       return this.openai;
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      console.warn('OPENAI_API_KEY not configured');
-      return null;
-    }
-
     try {
-      this.openai = new OpenAI({ apiKey });
+      this.openai = getMinimaxClient();
       return this.openai;
     } catch (error) {
       console.error('Failed to initialize OpenAI client:', error);
@@ -142,7 +137,7 @@ export class WorkflowAIService {
 
       // Call the OpenAI API
       const response = await client.chat.completions.create({
-        model: 'gpt-5.2',
+        model: process.env.MINIMAX_MODEL || 'MiniMax-M2.5',
         messages,
       });
 

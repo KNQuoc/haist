@@ -7,6 +7,7 @@
 import { Composio } from '@composio/core';
 import { OpenAIAgentsProvider } from '@composio/openai-agents';
 import { Agent, run } from '@openai/agents';
+import { getMinimaxModel } from '../minimax-model';
 import type {
   ToolRouterMessage,
   ToolRouterChatResponse,
@@ -292,7 +293,7 @@ RULES:
       const agent = new Agent({
         name: 'Personal Assistant',
         instructions: this.buildSystemPrompt(currentDateTime),
-        model: 'gpt-5.2',
+        model: getMinimaxModel(),
         tools: sessionData.tools,
       });
 
@@ -444,7 +445,7 @@ RULES:
       const agent = new Agent({
         name: 'Personal Assistant',
         instructions: this.buildSystemPrompt(currentDateTime),
-        model: 'gpt-5.2',
+        model: getMinimaxModel(),
         tools: sessionData.tools,
       });
 

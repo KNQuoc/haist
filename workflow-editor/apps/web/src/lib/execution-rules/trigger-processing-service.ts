@@ -552,10 +552,11 @@ class TriggerProcessingService {
 
     // Use the agent to send the message
     const { Agent, run } = await import('@openai/agents');
+    const { getMinimaxModel } = await import('../minimax-model');
     const agent = new Agent({
       name: 'Slack Sender',
       instructions: 'Send the provided message to the specified Slack channel.',
-      model: 'gpt-5.2',
+      model: getMinimaxModel(),
       tools,
     });
 
@@ -588,10 +589,11 @@ class TriggerProcessingService {
     const tools = await session.tools();
 
     const { Agent, run } = await import('@openai/agents');
+    const { getMinimaxModel } = await import('../minimax-model');
     const agent = new Agent({
       name: 'Gmail Sender',
       instructions: 'Send the provided email to the specified recipient.',
-      model: 'gpt-5.2',
+      model: getMinimaxModel(),
       tools,
     });
 

@@ -6,6 +6,7 @@
  */
 
 import OpenAI from 'openai';
+import { getMinimaxClient } from '../minimax-model';
 import { conversationsStorage } from '@/lib/ai-assistant/conversation-storage';
 import { artifactService } from './artifact-service';
 import { findMostSimilarArtifact, generateEmbedding } from './artifact-matcher';
@@ -17,14 +18,8 @@ let openaiClient: OpenAI | null = null;
 function getOpenAIClient(): OpenAI | null {
   if (openaiClient) return openaiClient;
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    console.warn('OPENAI_API_KEY not configured for conversation summarizer');
-    return null;
-  }
-
   try {
-    openaiClient = new OpenAI({ apiKey });
+    openaiClient = getMinimaxClient();
     return openaiClient;
   } catch (error) {
     console.error('Failed to initialize OpenAI client:', error);
@@ -127,7 +122,7 @@ async function summarizeAndStore(conversation: Conversation): Promise<SummarizeR
 
   // Generate summary
   const response = await client.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: process.env.MINIMAX_MODEL || 'MiniMax-M2.5',
     messages: [
       {
         role: 'system',
@@ -238,7 +233,7 @@ async function generateArtifactTitle(content: string): Promise<string> {
 
   try {
     const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: process.env.MINIMAX_MODEL || 'MiniMax-M2.5',
       messages: [
         {
           role: 'system',

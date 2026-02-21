@@ -8,6 +8,7 @@
 import { Composio } from '@composio/core';
 import { OpenAIAgentsProvider } from '@composio/openai-agents';
 import { Agent, run } from '@openai/agents';
+import { getMinimaxModel } from '../minimax-model';
 import type {
   ExecutionRule,
   TriggerPayload,
@@ -281,7 +282,7 @@ class RuleExecutorAgent {
       const agent = new Agent({
         name: 'Rule Executor',
         instructions: RULE_EXECUTOR_SYSTEM_PROMPT,
-        model: 'gpt-5.2',
+        model: getMinimaxModel(),
         tools: sessionData.tools,
       });
 
@@ -322,7 +323,7 @@ class RuleExecutorAgent {
         name: 'Rule Executor',
         instructions:
           'You are a tool executor. When given a tool name and parameters, call that exact tool immediately with the provided parameters. Do not modify the parameters.',
-        model: 'gpt-5.2',
+        model: getMinimaxModel(),
         tools: sessionData.tools,
       });
 

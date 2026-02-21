@@ -45,7 +45,7 @@ export const conversationsStorage = {
       conversations.push({
         id: doc._id as string,
         title: (doc as any).title || 'New conversation',
-        mode: (doc as any).mode || 'chat',
+        mode: 'tool-router',
         createdAt: toISO((doc as any).createdAt),
         updatedAt: toISO((doc as any).updatedAt),
         messages: [],
@@ -75,7 +75,7 @@ export const conversationsStorage = {
     return {
       id: doc._id as string,
       title: (doc as any).title || 'New conversation',
-      mode: (doc as any).mode || 'chat',
+      mode: 'tool-router',
       createdAt: toISO((doc as any).createdAt),
       updatedAt: toISO((doc as any).updatedAt),
       messages: [],

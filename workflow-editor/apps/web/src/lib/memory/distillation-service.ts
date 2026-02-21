@@ -8,6 +8,7 @@
 
 import { artifactService } from '@/lib/artifacts';
 import OpenAI from 'openai';
+import { getMinimaxClient } from '../minimax-model';
 
 const PROFILE_TITLE = '__user_profile__';
 const DAILY_PREFIX = 'Daily — ';
@@ -68,10 +69,10 @@ export async function distillMemory(userId: string, daysBack = 3): Promise<{
           .join('\n')
       : '';
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = getMinimaxClient();
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      model: process.env.MINIMAX_MODEL || 'MiniMax-M2.5',
       messages: [
         {
           role: 'system',

@@ -6,6 +6,7 @@
  */
 
 import OpenAI from 'openai';
+import { getMinimaxClient } from '../minimax-model';
 import type { ExecutionRule, TriggerPayload, RuleMatchResult } from './types';
 import { RULE_MATCHER_SYSTEM_PROMPT, buildRuleMatcherPrompt } from './prompts';
 
@@ -27,17 +28,11 @@ class RuleMatcherAgent {
   private getClient(): OpenAI | null {
     if (this.openai) return this.openai;
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      console.warn('[RuleMatcherAgent] OPENAI_API_KEY not configured');
-      return null;
-    }
-
     try {
-      this.openai = new OpenAI({ apiKey });
+      this.openai = getMinimaxClient();
       return this.openai;
     } catch (error) {
-      console.error('[RuleMatcherAgent] Failed to initialize OpenAI client:', error);
+      console.error('[RuleMatcherAgent] Failed to initialize MiniMax client:', error);
       return null;
     }
   }
@@ -74,7 +69,7 @@ class RuleMatcherAgent {
 
     try {
       const response = await client.chat.completions.create({
-        model: 'gpt-5-nano-2025-08-07',
+        model: process.env.MINIMAX_MODEL || 'MiniMax-M2.5',
         messages: [
           { role: 'system', content: RULE_MATCHER_SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },
