@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Pencil,
   ChevronDown,
+  GitBranch,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import ReactMarkdown from 'react-markdown';
@@ -31,6 +32,7 @@ import { ArtifactPicker } from './ArtifactPicker';
 import { ArtifactMention, useArtifactMention } from './ArtifactMention';
 import { RuleMention } from './RuleMention';
 import { useRuleMention, parseRuleMention, type MentionableRule } from '@/lib/ai-assistant/hooks/useRuleMention';
+import { AutomationFlowVisualizer } from './AutomationFlowVisualizer';
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -446,11 +448,25 @@ function ToolRouterMessageRow({ message }: { message: ToolRouterMessage }) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
   const [dismissedArtifacts, setDismissedArtifacts] = useState<Set<string>>(new Set());
+  const [showFlow, setShowFlow] = useState(false);
   const timestamp = message.timestamp ? formatTimestamp(message.timestamp) : null;
 
   const visibleArtifacts = message.injectedArtifacts?.filter(
     (a) => !dismissedArtifacts.has(a.id)
   );
+
+  // Only show real external service calls — hide all internal/app tools
+  const REAL_SERVICES = new Set([
+    'GMAIL', 'SLACK', 'GITHUB', 'NOTION', 'DISCORD', 'LINEAR', 'TWITTER',
+    'LINKEDIN', 'REDDIT', 'OUTLOOK', 'JIRA', 'ASANA', 'FIGMA', 'YOUTUBE',
+    'SALESFORCE', 'CALENDLY', 'CANVA', 'CANVAS', 'APOLLO', 'EXA', 'FIRECRAWL',
+    'GOOGLECALENDAR', 'GOOGLEDRIVE', 'GOOGLESHEETS', 'GOOGLEDOCS',
+    'GOOGLETASKS', 'GOOGLEMEET', 'GOOGLE_MAPS', 'ONE_DRIVE', 'MICROSOFT_TEAMS',
+  ]);
+  const visibleToolCalls = (message.toolCalls || []).filter((tc) =>
+    REAL_SERVICES.has(tc.toolkit.toUpperCase())
+  );
+  const hasToolCalls = visibleToolCalls.length > 0;
 
   const handleCopy = async () => {
     if (message.content) {
@@ -498,7 +514,7 @@ function ToolRouterMessageRow({ message }: { message: ToolRouterMessage }) {
       {/* Injected artifacts indicator */}
       {visibleArtifacts && visibleArtifacts.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap mb-2 text-xs text-muted-foreground">
-          <span>📎 Using context from:</span>
+          <span>Using context from:</span>
           {visibleArtifacts.map((a) => (
             <span
               key={a.id}
@@ -554,6 +570,48 @@ function ToolRouterMessageRow({ message }: { message: ToolRouterMessage }) {
             </ReactMarkdown>
           </div>
         )}
+
+        {/* Tool call cards — only real service calls, not internal orchestration */}
+        {hasToolCalls && (
+          <div className="mt-3 space-y-1.5">
+            {visibleToolCalls.map((tc) => (
+              <ToolCallCard key={tc.id} toolCall={tc} />
+            ))}
+          </div>
+        )}
+
+        {/* View Automation Flow button — only when there are real service calls */}
+        {hasToolCalls && (
+          <div className="mt-4">
+            <button
+              onClick={() => setShowFlow(!showFlow)}
+              className={clsx(
+                'af-view-btn inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium',
+                'border transition-all duration-200',
+                showFlow
+                  ? 'bg-primary/10 border-primary/30 text-primary'
+                  : 'bg-card border-border text-foreground hover:border-primary/30 hover:bg-primary/5'
+              )}
+            >
+              <GitBranch className="w-4 h-4" />
+              {showFlow ? 'Hide' : 'View'} Automation Flow
+              {!showFlow && (
+                <span className="text-xs text-muted-foreground ml-1">
+                  {visibleToolCalls.length} step{visibleToolCalls.length !== 1 ? 's' : ''}
+                </span>
+              )}
+            </button>
+
+            {showFlow && (
+              <div className="mt-3 animate-scale-in">
+                <AutomationFlowVisualizer
+                  toolCalls={visibleToolCalls}
+                  onClose={() => setShowFlow(false)}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <div className="chat-action-bar" role="group" aria-label="Message actions">
         <button
@@ -588,6 +646,7 @@ function MessageRow({
 }) {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
+  const [showFlow, setShowFlow] = useState(false);
   const timestamp = message.timestamp ? formatTimestamp(message.timestamp) : null;
 
   // Remove workflow JSON blocks from displayed content
@@ -650,41 +709,76 @@ function MessageRow({
 
         {/* Workflow card if present */}
         {message.workflow && (
-          <div
-            className={clsx(
-              'mt-5 p-5 rounded-2xl cursor-pointer',
-              'bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5',
-              'border border-border',
-              'hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5',
-              'transition-all duration-300 group/workflow'
-            )}
-            onClick={() => onSelectWorkflow(message.workflow!)}
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-md">
-                <Workflow className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <span className="font-semibold text-foreground group-hover/workflow:text-primary transition-colors">
-                  {message.workflow.metadata.name}
-                </span>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                  <span>{message.workflow.nodes.length} nodes</span>
-                  <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
-                  <span>{message.workflow.edges.length} connections</span>
+          <>
+            <div
+              className={clsx(
+                'mt-5 p-5 rounded-2xl cursor-pointer',
+                'bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5',
+                'border border-border',
+                'hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5',
+                'transition-all duration-300 group/workflow'
+              )}
+              onClick={() => onSelectWorkflow(message.workflow!)}
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-md">
+                  <Workflow className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <span className="font-semibold text-foreground group-hover/workflow:text-primary transition-colors">
+                    {message.workflow.metadata.name}
+                  </span>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                    <span>{message.workflow.nodes.length} nodes</span>
+                    <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+                    <span>{message.workflow.edges.length} connections</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            {message.workflow.metadata.description && (
-              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                {message.workflow.metadata.description}
+              {message.workflow.metadata.description && (
+                <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                  {message.workflow.metadata.description}
+                </p>
+              )}
+              <p className="text-xs text-primary font-medium flex items-center gap-1">
+                Click to preview
+                <span className="group-hover/workflow:translate-x-1 transition-transform">→</span>
               </p>
+            </div>
+
+            {/* View Automation Flow button for workflows */}
+            {message.workflow.nodes.length > 0 && (
+              <div className="mt-3">
+                <button
+                  onClick={() => setShowFlow(!showFlow)}
+                  className={clsx(
+                    'af-view-btn inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium',
+                    'border transition-all duration-200',
+                    showFlow
+                      ? 'bg-primary/10 border-primary/30 text-primary'
+                      : 'bg-card border-border text-foreground hover:border-primary/30 hover:bg-primary/5'
+                  )}
+                >
+                  <GitBranch className="w-4 h-4" />
+                  {showFlow ? 'Hide' : 'View'} Automation Flow
+                  {!showFlow && (
+                    <span className="text-xs text-muted-foreground ml-1">
+                      {message.workflow.nodes.length} step{message.workflow.nodes.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </button>
+
+                {showFlow && (
+                  <div className="mt-3 animate-scale-in">
+                    <AutomationFlowVisualizer
+                      workflow={message.workflow}
+                      onClose={() => setShowFlow(false)}
+                    />
+                  </div>
+                )}
+              </div>
             )}
-            <p className="text-xs text-primary font-medium flex items-center gap-1">
-              Click to preview
-              <span className="group-hover/workflow:translate-x-1 transition-transform">→</span>
-            </p>
-          </div>
+          </>
         )}
 
         {/* Required connections warning */}

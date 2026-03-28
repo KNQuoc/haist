@@ -130,6 +130,27 @@ function AutomationsContent() {
     }
   };
 
+  // Execute rule immediately
+  const [executingRuleId, setExecutingRuleId] = useState<string | null>(null);
+  const executeRule = async (rule: ExecutionRule) => {
+    setExecutingRuleId(rule.id);
+    setError(null);
+    try {
+      const res = await fetch('/api/automations/invoke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ruleId: rule.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to execute rule');
+      fetchRules();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to execute rule');
+    } finally {
+      setExecutingRuleId(null);
+    }
+  };
+
   return (
     <AuthenticatedLayout title="Automations">
       <div className="p-6 max-w-5xl mx-auto">
@@ -387,6 +408,8 @@ function AutomationsContent() {
                     onToggleActive={() => toggleRule(rule)}
                     onEdit={() => setEditingRule(rule)}
                     onDelete={() => deleteRule(rule.id)}
+                    onExecuteNow={() => executeRule(rule)}
+                    isExecuting={executingRuleId === rule.id}
                     onViewLogs={() => {
                       setLogsRuleId(rule.id);
                       setLogsRuleName(rule.name);
@@ -422,6 +445,8 @@ function RuleCard({
   onToggleActive,
   onEdit,
   onDelete,
+  onExecuteNow,
+  isExecuting,
   onViewLogs,
 }: {
   rule: ExecutionRule;
@@ -430,6 +455,8 @@ function RuleCard({
   onToggleActive: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onExecuteNow: () => void;
+  isExecuting: boolean;
   onViewLogs: () => void;
 }) {
   return (
@@ -488,6 +515,24 @@ function RuleCard({
               <Pause className="w-4 h-4" />
             ) : (
               <Play className="w-4 h-4" />
+            )}
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onExecuteNow();
+            }}
+            disabled={isExecuting}
+            className={clsx(
+              'p-2 rounded-md transition-colors',
+              'text-primary hover:bg-primary/10'
+            )}
+            title="Execute now"
+          >
+            {isExecuting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Zap className="w-4 h-4" />
             )}
           </button>
           <button

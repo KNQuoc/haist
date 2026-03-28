@@ -45,3 +45,51 @@ Thumbs.db
 
 # Test coverage
 coverage/
+
+# AI tool configs
+.claude/
+.adal/
+.agents/
+.augment/
+.codebuddy/
+.commandcode/
+.continue/
+.cortex/
+.crush/
+.factory/
+.goose/
+.iflow/
+.junie/
+.kilocode/
+.kiro/
+.kode/
+.mcpjam/
+.mux/
+.neovate/
+.openhands/
+.pi/
+.pochi/
+.qoder/
+.qwen/
+.roo/
+.trae/
+.vibe/
+.windsurf/
+.zencoder/
+
+# Skills
+skills/
+skills-lock.json
+
+# Convex
+.convex/
+
+# Patches
+patches/
+
+# Side projects
+imessage-bridge/
+
+# Root package files (not part of monorepo)
+/package.json
+/package-lock.json

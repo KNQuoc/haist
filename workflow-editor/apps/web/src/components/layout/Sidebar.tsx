@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { DEV_USER } from "@/lib/dev-user";
-// NotificationBell moved to AuthenticatedLayout header
 import { SidebarConversations } from "./SidebarConversations";
 import { useConversationStore } from "@/lib/ai-assistant/conversation-store";
 
@@ -67,8 +66,6 @@ export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps)
 
   // Try to get tutorial context on mount
   useEffect(() => {
-    // This is a workaround since Sidebar might be rendered outside TutorialProvider
-    // We'll check if the tutorial state exists in localStorage
     try {
       const stored = localStorage.getItem("haist-tutorial-state");
       if (stored) {
@@ -78,7 +75,6 @@ export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps)
             isActive: parsed.isActive,
             currentStep: parsed.currentStep,
             nextStep: () => {
-              // Update localStorage and trigger re-render
               const updated = { ...parsed, currentStep: parsed.currentStep + 1 };
               localStorage.setItem("haist-tutorial-state", JSON.stringify(updated));
               setTutorialContext(prev => prev ? { ...prev, currentStep: updated.currentStep } : null);
@@ -91,7 +87,7 @@ export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps)
     }
   }, []);
 
-  // Listen for storage changes (when tutorial advances on other pages)
+  // Listen for storage changes
   useEffect(() => {
     const handleStorage = () => {
       try {
@@ -117,7 +113,6 @@ export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps)
     };
 
     window.addEventListener("storage", handleStorage);
-    // Also poll for changes since storage event doesn't fire in same tab
     const interval = setInterval(handleStorage, 500);
     return () => {
       window.removeEventListener("storage", handleStorage);
@@ -128,11 +123,9 @@ export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps)
   // Handle nav click for tutorial advancement
   const handleNavClick = (href: string) => {
     if (tutorialContext?.isActive) {
-      // Step 4: User clicks Automations
       if (tutorialContext.currentStep === 4 && href === "/automations") {
         tutorialContext.nextStep();
       }
-      // Step 6: User clicks Artifacts
       if (tutorialContext.currentStep === 6 && href === "/artifacts") {
         tutorialContext.nextStep();
       }
@@ -142,55 +135,58 @@ export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps)
   return (
     <aside
       className={clsx(
-        "h-screen bg-card border-r border-border flex flex-col shrink-0 transition-[width] duration-150 ease-out",
-        isCollapsed ? "w-[3.05rem]" : "w-64"
+        "h-screen bg-card/70 backdrop-blur-xl border-r border-border/50 flex flex-col shrink-0 transition-[width] duration-200 ease-out relative",
+        isCollapsed ? "w-[3.25rem]" : "w-60"
       )}
     >
+      {/* Subtle inner glow at top */}
+      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-primary/[0.03] to-transparent pointer-events-none" />
+
       {/* Header with Logo */}
-      <div className="relative flex w-full items-center p-2 pt-2">
+      <div className="relative flex w-full items-center p-2 pt-3">
         <div
           className={clsx(
-            "flex items-center gap-1.5 pl-2 h-8 overflow-hidden transition-opacity duration-150",
+            "flex items-center gap-2 pl-2 h-8 overflow-hidden transition-opacity duration-200",
             isCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
           )}
         >
           <Link
             href="/automations"
             onClick={() => clearActiveConversation()}
-            className="flex flex-row items-center gap-2"
+            className="flex flex-row items-center gap-2.5 group"
             aria-label="Home"
           >
             <Image
               src="/haist-logo.png"
               alt="haist"
-              width={28}
-              height={28}
-              className="h-7 w-7 flex-shrink-0"
+              width={24}
+              height={24}
+              className="h-6 w-6 flex-shrink-0 transition-transform duration-200 group-hover:scale-110"
             />
-            <span className="text-sm font-semibold text-foreground">haist</span>
+            <span className="text-sm font-semibold text-foreground tracking-tight font-display">
+              haist
+            </span>
           </Link>
         </div>
-        <div className={clsx("absolute top-2 flex items-center gap-1", isCollapsed ? "left-1/2 -translate-x-1/2" : "right-2")}>
+        <div className={clsx("absolute top-3 flex items-center gap-1", isCollapsed ? "left-1/2 -translate-x-1/2" : "right-2")}>
           <button
             onClick={onToggleCollapse}
             className={clsx(
               "inline-flex items-center justify-center",
-              "h-8 w-8 rounded-md",
-              "active:scale-95 transition-colors group",
-              "hover:bg-muted"
+              "h-7 w-7 rounded-lg",
+              "active:scale-90 transition-all duration-200 group",
+              "hover:bg-foreground/[0.06]"
             )}
             type="button"
             aria-label={isCollapsed ? "Open sidebar" : "Close sidebar"}
           >
-            <div className="relative size-4 flex items-center justify-center">
-              <PanelLeft className="w-5 h-5 transition text-muted-foreground group-hover:text-foreground" />
-            </div>
+            <PanelLeft className="w-4 h-4 transition text-muted-foreground group-hover:text-foreground" />
           </button>
         </div>
       </div>
 
       {/* New Chat Button */}
-      <div className="flex flex-col gap-px pt-2">
+      <div className="flex flex-col gap-px pt-3 relative z-[1]">
         <div className="px-2">
           <Link
             href="/chat"
@@ -198,40 +194,30 @@ export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps)
             className={clsx(
               "sidebar-nav-item group",
               "h-8 w-full rounded-lg py-1.5",
-              isCollapsed ? "px-0 justify-center" : "px-4",
-              "active:bg-muted active:scale-100"
+              isCollapsed ? "px-0 justify-center" : "px-3",
+              "active:bg-muted active:scale-[0.98]"
             )}
           >
             <div
               className={clsx(
-                "w-full flex flex-row items-center gap-3",
-                isCollapsed ? "justify-center" : "-translate-x-2 justify-start"
+                "w-full flex flex-row items-center gap-2.5",
+                isCollapsed ? "justify-center" : "justify-start"
               )}
             >
               <div className="flex items-center justify-center text-foreground">
-                <div className="flex items-center justify-center rounded-full transition-all ease-in-out group-hover:-rotate-3 group-hover:scale-110 group-active:rotate-6 group-active:scale-[0.98]">
-                  <div className="flex items-center justify-center rounded-full size-[1.4rem] -mx-[0.2rem] bg-foreground/10 group-hover:bg-foreground/15">
-                    <Plus className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
+                <div className="flex items-center justify-center rounded-full transition-all duration-200 ease-out group-hover:rotate-90 group-active:scale-90">
+                  <div className="flex items-center justify-center rounded-full size-5 bg-primary/15 group-hover:bg-primary/25">
+                    <Plus className="w-3.5 h-3.5 text-primary" />
                   </div>
                 </div>
               </div>
               <span
                 className={clsx(
-                  "truncate text-sm whitespace-nowrap flex-1 text-foreground transition-opacity duration-150",
+                  "truncate text-sm whitespace-nowrap flex-1 text-muted-foreground group-hover:text-foreground transition-all duration-200",
                   isCollapsed ? "opacity-0 hidden" : "opacity-100"
                 )}
               >
                 New chat
-              </span>
-              <span
-                className={clsx(
-                  "flex items-center flex-shrink-0 -mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-75",
-                  isCollapsed && "hidden"
-                )}
-              >
-                <span className="text-muted-foreground text-xs px-0.5">
-                  ⇧⌘O
-                </span>
               </span>
             </div>
           </Link>
@@ -239,8 +225,8 @@ export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps)
       </div>
 
       {/* Navigation */}
-      <div className="flex flex-grow flex-col overflow-y-auto overflow-x-hidden relative transition-[border-color] border-t-[0.5px] border-transparent mt-2">
-        <nav className="flex flex-col px-2 gap-px">
+      <div className="flex flex-grow flex-col overflow-y-auto overflow-x-hidden relative transition-[border-color] border-t border-border/30 mt-3">
+        <nav className="flex flex-col px-2 gap-0.5 pt-2">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;
@@ -248,7 +234,6 @@ export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps)
             const isAutomations = item.href === "/automations";
             const isArtifacts = item.href === "/artifacts";
 
-            // Determine if this nav item should be highlighted for tutorial
             const isTutorialHighlight =
               tutorialContext?.isActive &&
               ((tutorialContext.currentStep === 4 && isAutomations) ||
@@ -269,44 +254,33 @@ export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps)
                   className={clsx(
                     "sidebar-nav-item",
                     "h-8 w-full rounded-lg py-1.5",
-                    isCollapsed ? "px-0 justify-center" : "px-4",
-                    "active:bg-muted active:scale-100",
-                    isActive && "!bg-muted",
+                    isCollapsed ? "px-0 justify-center" : "px-3",
+                    "active:bg-muted active:scale-[0.98]",
+                    isActive && "!bg-primary/[0.08] !text-foreground",
                     isTutorialHighlight && "ring-2 ring-primary ring-offset-2 ring-offset-background"
                   )}
                 >
                   <div
                     className={clsx(
-                      "w-full flex flex-row items-center gap-3",
-                      isCollapsed ? "justify-center" : "-translate-x-2 justify-start"
+                      "w-full flex flex-row items-center gap-2.5",
+                      isCollapsed ? "justify-center" : "justify-start"
                     )}
                   >
-                    <div className="flex items-center justify-center text-foreground">
-                      <div
-                        className="group"
-                        style={{
-                          width: "16px",
-                          height: "16px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Icon
-                          className={clsx(
-                            "w-5 h-5",
-                            isActive
-                              ? "text-foreground"
-                              : "text-muted-foreground group-hover:text-foreground"
-                          )}
-                        />
-                      </div>
+                    <div className="flex items-center justify-center">
+                      <Icon
+                        className={clsx(
+                          "w-4 h-4 transition-colors duration-200",
+                          isActive
+                            ? "text-primary"
+                            : "text-muted-foreground group-hover:text-foreground"
+                        )}
+                      />
                     </div>
                     <span
                       className={clsx(
-                        "truncate text-sm whitespace-nowrap flex-1 transition-opacity duration-150",
+                        "truncate text-sm whitespace-nowrap flex-1 transition-all duration-200",
                         isActive
-                          ? "text-foreground"
+                          ? "text-foreground font-medium"
                           : "text-muted-foreground group-hover:text-foreground",
                         isCollapsed ? "opacity-0 hidden" : "opacity-100"
                       )}
@@ -314,23 +288,28 @@ export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps)
                       {item.label}
                     </span>
                     {item.external && !isCollapsed && (
-                      <ExternalLink className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-50 transition-opacity" />
+                      <ExternalLink className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-50 transition-opacity" />
                     )}
                   </div>
                 </Link>
+
+                {/* Active indicator line */}
+                {isActive && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full bg-primary" />
+                )}
               </div>
             );
           })}
         </nav>
 
-        {/* Conversations List - Hidden when collapsed */}
+        {/* Conversations List */}
         {!isCollapsed && <SidebarConversations />}
       </div>
 
       {/* Footer - Dev User */}
-      <div className="flex items-center gap-2 transition border-t border-border px-3 py-3">
-        <div className="flex shrink-0 items-center justify-center rounded-full font-medium select-none h-8 w-8 text-xs bg-primary/10 text-primary">
-          D
+      <div className="flex items-center gap-2.5 border-t border-border/30 px-3 py-3 relative z-[1]">
+        <div className="flex shrink-0 items-center justify-center rounded-full font-medium select-none h-7 w-7 text-xs bg-primary/10 text-primary ring-1 ring-primary/20">
+          {DEV_USER.name.charAt(0).toUpperCase()}
         </div>
         {!isCollapsed && (
           <span className="text-sm text-muted-foreground truncate">{DEV_USER.name}</span>
@@ -362,7 +341,7 @@ export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps)
   );
 }
 
-// Custom tutorial tooltip for sidebar (doesn't require TutorialProvider context)
+// Custom tutorial tooltip for sidebar
 function SidebarTutorialTooltip({
   targetRef,
   title,
@@ -412,17 +391,17 @@ function SidebarTutorialTooltip({
 
   return (
     <>
-      {/* Overlay - darken everything except target */}
+      {/* Overlay */}
       <div
-        className="fixed left-0 right-0 top-0 bg-black/50 z-[50] animate-fade-in"
+        className="fixed left-0 right-0 top-0 bg-black/60 z-[50] animate-fade-in"
         style={{ height: Math.max(0, rect.top - 4) }}
       />
       <div
-        className="fixed left-0 right-0 bottom-0 bg-black/50 z-[50] animate-fade-in"
+        className="fixed left-0 right-0 bottom-0 bg-black/60 z-[50] animate-fade-in"
         style={{ top: rect.bottom + 4 }}
       />
       <div
-        className="fixed left-0 bg-black/50 z-[50] animate-fade-in"
+        className="fixed left-0 bg-black/60 z-[50] animate-fade-in"
         style={{
           top: rect.top - 4,
           width: Math.max(0, rect.left - 4),
@@ -430,7 +409,7 @@ function SidebarTutorialTooltip({
         }}
       />
       <div
-        className="fixed right-0 bg-black/50 z-[50] animate-fade-in"
+        className="fixed right-0 bg-black/60 z-[50] animate-fade-in"
         style={{
           top: rect.top - 4,
           left: rect.right + 4,
@@ -440,14 +419,14 @@ function SidebarTutorialTooltip({
 
       {/* Highlight border */}
       <div
-        className="fixed border-2 border-primary/50 animate-pulse-glow pointer-events-none z-[51]"
+        className="fixed border border-primary/50 animate-pulse-glow pointer-events-none z-[51]"
         style={{
           left: rect.left - 4,
           top: rect.top - 4,
           width: rect.width + 8,
           height: rect.height + 8,
-          borderRadius: 8,
-          boxShadow: "0 0 20px hsl(var(--primary) / 0.3)",
+          borderRadius: 10,
+          boxShadow: "0 0 20px hsl(var(--primary) / 0.2)",
         }}
       />
 
@@ -460,21 +439,17 @@ function SidebarTutorialTooltip({
           transform: "translateY(-50%)",
         }}
       >
-        <div className="relative bg-card border border-border rounded-xl shadow-lg overflow-hidden">
-          {/* Arrow pointing left */}
+        <div className="relative glass border border-border/60 rounded-xl shadow-2xl overflow-hidden">
           <div className="tutorial-arrow-left" />
-
           <div className="p-4">
-            <h4 className="font-semibold text-foreground mb-1">{title}</h4>
-            <p className="text-sm text-muted-foreground mb-4">{message}</p>
-
-            {/* Progress dots */}
+            <h4 className="font-semibold text-foreground mb-1 text-sm">{title}</h4>
+            <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{message}</p>
             <div className="flex items-center gap-1.5">
               {Array.from({ length: totalSteps }, (_, i) => (
                 <div
                   key={i}
                   className={clsx(
-                    "w-2 h-2 rounded-full transition-colors",
+                    "w-1.5 h-1.5 rounded-full transition-colors",
                     i + 1 === currentStep
                       ? "bg-primary"
                       : i + 1 < currentStep

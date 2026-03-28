@@ -51,13 +51,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if rule supports manual invocation
-    if (rule.activationMode !== 'manual' && rule.activationMode !== 'all') {
-      return NextResponse.json(
-        { error: 'Rule does not support manual invocation' },
-        { status: 400 }
-      );
-    }
+    // Allow manual invocation for any activation mode (Execute Now)
 
     // Execute the rule with manual context + conversation history
     const result = await triggerProcessingService.processManual(

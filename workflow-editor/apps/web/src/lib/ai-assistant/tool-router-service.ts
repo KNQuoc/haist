@@ -17,6 +17,7 @@ import { createArtifactTools } from './artifact-tools';
 import { createUserProfileTools, getUserProfileContext } from './user-profile-tools';
 import { createOpenClawTools } from './openclaw-tools';
 import { openClawService } from '@/lib/openclaw/openclaw-service';
+import { hydraClient } from '@/lib/hydra';
 
 // Types for internal use
 type AgentTools = Awaited<ReturnType<Awaited<ReturnType<Composio<OpenAIAgentsProvider>['create']>>['tools']>>;
@@ -25,6 +26,7 @@ interface ComposioSessionData {
   tools: AgentTools;
   userId: string;
   createdAt: Date;
+  hydraSessionId?: string;
 }
 
 /**
@@ -33,6 +35,7 @@ interface ComposioSessionData {
 class ToolRouterService {
   private composio: Composio<OpenAIAgentsProvider> | null = null;
   private sessions: Map<string, ComposioSessionData> = new Map();
+  private hydraInitialized = false;
 
   private getComposio(): Composio<OpenAIAgentsProvider> | null {
     if (this.composio) return this.composio;
@@ -125,7 +128,7 @@ MEMORY SYSTEM:
 You have a 3-tier memory system using artifacts. Be PROACTIVE about remembering — don't wait to be asked.
 
 1. SOUL (__user_profile__): Who the user is. Preferences, facts, patterns, recurring needs.
-   → Use update_user_profile whenever you learn something about the user: their name, job, school, preferences, habits, tools they use, communication style, important people in their life, recurring tasks. Do this silently — don't announce it.
+   → ONLY use update_user_profile when the user tells you something genuinely NEW about themselves that isn't already in your context (a new preference, new job, new project, etc.). Do NOT re-save information you already know. Do NOT call it on greetings or casual messages. NEVER mention saving profile data to the user — do it completely silently with zero acknowledgment.
 
 2. DAILY MEMORY: What happened today. Key decisions, tasks completed, important context.
    → After completing a task or learning something time-specific, use add_to_artifact to add it to today's daily artifact (title format: "Daily — YYYY-MM-DD"). If it doesn't exist, use save_to_artifacts to create it. Keep entries concise.
@@ -136,11 +139,11 @@ You have a 3-tier memory system using artifacts. Be PROACTIVE about remembering 
 
 ARTIFACT RULES:
 - ALWAYS search before creating — don't create duplicates.
-- Be proactive: after completing tasks, silently note key facts in the appropriate tier. Don't ask "should I save this?"
-- Don't save trivial things (greetings, one-word answers, casual chat).
+- Only save meaningful NEW information. Never save greetings, casual chat, or information you already have.
+- NEVER tell the user you're saving, updating, or remembering anything. All memory operations are invisible.
 - DO save: travel plans, meeting outcomes, preferences, project decisions, important dates, research findings.
-- If "Relevant information from previous conversations (artifacts)" is provided above, USE that context — don't start from scratch.
-- Reference artifact information naturally in your responses when relevant.
+- If "Relevant information from previous conversations (artifacts)" is provided above, only use it if it's DIRECTLY relevant to what the user is asking about RIGHT NOW. Ignore artifact context that doesn't match the current conversation topic. Never assume the user is continuing a previous conversation unless they explicitly say so.
+- Reference artifact information naturally in your responses, but only when it's clearly relevant to the current request.
 
 EMAIL THREADING:
 - Gmail: When replying to an existing email, ALWAYS use GMAIL_REPLY_TO_THREAD with the thread_id. Use GMAIL_SEND_EMAIL ONLY for brand new conversations with no prior thread.
@@ -155,7 +158,7 @@ RULES:
 - Never mention tool names, APIs, or technical details to the user.
 - Never show raw URLs, event IDs, item IDs, or technical identifiers from tool results. Summarize the outcome in plain language instead (e.g., "Added to your Google Calendar" not the full event URL).
 - Be proactive: if the user asks about email/calendar/GitHub, fetch it yourself instead of asking them.
-- Use update_user_profile to remember stable facts about the user (school, projects, preferences).
+- Only call update_user_profile for genuinely NEW facts. Never re-save what you already know. Never mention it to the user.
 - Look things up before asking. Only ask when you genuinely can't find the answer.
 - For dates/deadlines, use the current date above to filter for future items only.`;
   }
@@ -282,7 +285,28 @@ RULES:
 
       fullInput += `User: ${message}`;
 
-      // Get current date/time for context
+      let hydraContext = '';
+      if (hydraClient.isConfigured()) {
+        try {
+          if (!this.hydraInitialized) {
+            this.hydraInitialized = await hydraClient.initialize();
+          }
+          const recall = await hydraClient.recall(message, userId, {
+            searchMode: 'both',
+            graphDepth: 3,
+          });
+          if (recall) {
+            hydraContext = hydraClient.formatRecallAsContext(recall);
+          }
+        } catch {
+          // noop
+        }
+      }
+
+      if (hydraContext) {
+        fullInput = `<hydradb-context>\n${hydraContext}\n</hydradb-context>\n\n${fullInput}`;
+      }
+
       const now = new Date();
       const currentDateTime = now.toLocaleString('en-US', {
         weekday: 'long',
@@ -294,7 +318,6 @@ RULES:
         timeZoneName: 'short',
       });
 
-      // Create agent with Composio tools
       const agent = new Agent({
         name: 'Personal Assistant',
         instructions: this.buildSystemPrompt(currentDateTime, userId),
@@ -302,10 +325,13 @@ RULES:
         tools: sessionData.tools,
       });
 
-      // Run the agent with the user's message
       const result = await run(agent, fullInput, { maxTurns: 15 });
 
-      // Extract tool calls from the run result if available
+      hydraClient.captureConversationTurn(userId, userId, 'user', message).catch(() => {});
+      if (result.finalOutput) {
+        hydraClient.captureConversationTurn(userId, userId, 'assistant', result.finalOutput).catch(() => {});
+      }
+
       const toolCalls: ToolCallResult[] = [];
 
       // The result.newItems contains all the items from this run
@@ -434,7 +460,25 @@ RULES:
 
       fullInput += `User: ${message}`;
 
-      // Get current date/time for context
+      let hydraContext = '';
+      if (hydraClient.isConfigured()) {
+        try {
+          const recall = await hydraClient.recall(message, userId, {
+            searchMode: 'both',
+            graphDepth: 3,
+          });
+          if (recall) {
+            hydraContext = hydraClient.formatRecallAsContext(recall);
+          }
+        } catch {
+          // noop
+        }
+      }
+
+      if (hydraContext) {
+        fullInput = `<hydradb-context>\n${hydraContext}\n</hydradb-context>\n\n${fullInput}`;
+      }
+
       const now = new Date();
       const currentDateTime = now.toLocaleString('en-US', {
         weekday: 'long',
@@ -446,7 +490,6 @@ RULES:
         timeZoneName: 'short',
       });
 
-      // Create agent with Composio tools
       const agent = new Agent({
         name: 'Personal Assistant',
         instructions: this.buildSystemPrompt(currentDateTime, userId),
@@ -454,9 +497,10 @@ RULES:
         tools: sessionData.tools,
       });
 
-      // Run the agent with streaming enabled
+      hydraClient.captureConversationTurn(userId, userId, 'user', message).catch(() => {});
+
       const streamResult = await run(agent, fullInput, { stream: true, maxTurns: 15 });
-      
+
       return streamResult;
     } catch (error) {
       console.error('Tool router chat stream error:', error);

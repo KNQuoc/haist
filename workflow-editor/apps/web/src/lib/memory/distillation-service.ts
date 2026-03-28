@@ -8,6 +8,7 @@
 
 import { artifactService } from '@/lib/artifacts';
 import OpenAI from 'openai';
+import { hydraClient } from '@/lib/hydra';
 
 const PROFILE_TITLE = '__user_profile__';
 const DAILY_PREFIX = 'Daily — ';
@@ -122,7 +123,6 @@ Example output: ["User is traveling to SFO Feb 20-24 for a conference", "Prefers
       return { success: true, dailiesReviewed: dailyArtifacts.length, insightsAdded: 0 };
     }
 
-    // Add each insight to the soul artifact
     let added = 0;
     for (const insight of insights) {
       if (typeof insight === 'string' && insight.trim()) {
@@ -130,9 +130,16 @@ Example output: ["User is traveling to SFO Feb 20-24 for a conference", "Prefers
           content: insight.trim(),
           source: 'manual',
         });
+        hydraClient.captureMemory(userId, insight.trim(), {
+          type: 'distilled_insight',
+          source: 'soul_artifact',
+          dailiesReviewed: dailyArtifacts.length,
+        }).catch(() => {});
         added++;
       }
     }
+
+    hydraClient.triggerDecay(userId).catch(() => {});
 
     return { success: true, dailiesReviewed: dailyArtifacts.length, insightsAdded: added };
   } catch (error) {

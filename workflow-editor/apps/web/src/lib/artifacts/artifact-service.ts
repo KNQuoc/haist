@@ -16,6 +16,7 @@ import type {
   FindSimilarOptions,
   ArtifactSearchResult,
 } from './types';
+import { hydraClient } from '@/lib/hydra';
 
 /** In-memory stores (use globalThis to survive Next.js dev-mode HMR) */
 const g = globalThis as unknown as {
@@ -97,7 +98,12 @@ export const artifactService = {
 
     artifacts.set(id, artifact);
 
-    // Add first entry if provided
+    hydraClient.ingestKnowledge(
+      id,
+      `${params.title}\n${params.summary || ''}`,
+      'artifact',
+      { userId: params.userId, tags: params.tags }
+    ).catch(() => {});
     if (params.firstEntry) {
       await this.addEntry(id, {
         workflowId: params.firstEntry.workflowId,
@@ -162,7 +168,12 @@ export const artifactService = {
 
     entries.set(id, entry);
 
-    // Update artifact's updatedAt timestamp
+    hydraClient.ingestKnowledge(
+      id,
+      params.content,
+      'artifact',
+      { artifactId, source: params.source }
+    ).catch(() => {});
     const artifact = artifacts.get(artifactId);
     if (artifact) {
       artifact.updatedAt = now;

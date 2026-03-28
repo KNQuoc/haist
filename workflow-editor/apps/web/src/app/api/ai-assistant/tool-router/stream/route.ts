@@ -40,8 +40,8 @@ export async function POST(request: NextRequest) {
       const matchedArtifacts = await findArtifactsWithConfidence({
         userId,
         message: body.message,
-        maxArtifacts: 3,
-        minConfidence: 0.6,
+        maxArtifacts: 2,
+        minConfidence: 0.85,
       });
 
       if (matchedArtifacts.length > 0) {

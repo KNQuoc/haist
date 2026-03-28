@@ -1268,15 +1268,20 @@ function AIAssistantContent() {
 
   if (showChat && hasMessages) {
     return (
-      <div className="flex h-screen bg-background overflow-hidden">
+      <div className="flex h-screen bg-background overflow-hidden relative">
+        {/* Ambient background */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-[40%] -left-[20%] w-[60%] h-[60%] rounded-full opacity-[0.025] blur-[120px]" style={{ background: 'hsl(var(--primary))' }} />
+          <div className="absolute -bottom-[30%] -right-[15%] w-[50%] h-[50%] rounded-full opacity-[0.015] blur-[100px]" style={{ background: 'hsl(var(--primary))' }} />
+        </div>
         <Sidebar
           isCollapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 relative z-[1]">
           {/* Error Banner */}
           {error && (
-            <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-3 animate-slide-in-from-bottom">
+            <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-3 animate-slide-in-from-bottom backdrop-blur-sm">
               <div className="text-sm text-destructive">{error}</div>
             </div>
           )}
@@ -1325,14 +1330,19 @@ function AIAssistantContent() {
     return days[new Date().getDay()];
   };
 
-  // Landing page view - Claude style
+  // Landing page view
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen bg-background overflow-hidden relative">
+      {/* Ambient background orbs */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[10%] left-[30%] w-[40%] h-[40%] rounded-full opacity-[0.035] blur-[140px] animate-float" style={{ background: 'hsl(var(--primary))' }} />
+        <div className="absolute bottom-[20%] right-[20%] w-[30%] h-[30%] rounded-full opacity-[0.02] blur-[100px] animate-float delay-300" style={{ background: 'hsl(var(--primary))' }} />
+      </div>
       <Sidebar
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
-      <div className="flex-1 flex flex-col min-w-0 text-foreground relative overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 text-foreground relative overflow-hidden z-[1]">
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto thin-scrollbar">
           <main className="mx-auto w-full max-w-2xl px-4 md:px-8 pt-[15vh] md:pt-[20vh] flex flex-col items-center gap-8">
@@ -1436,7 +1446,7 @@ function AIAssistantContent() {
 
               {/* Template suggestions */}
               {selectedCategory && categoryTemplates[selectedCategory] && (
-                <div className="mt-6 p-5 bg-card rounded-xl border border-border animate-scale-in">
+                <div className="mt-6 p-5 glass rounded-xl border border-border/50 animate-scale-in shadow-lg">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-medium text-foreground">
                       {categories.find((c) => c.id === selectedCategory)?.label}{" "}
@@ -1592,8 +1602,8 @@ function AIAssistantContent() {
 
       {/* OpenClaw Connection Modal */}
       {showOpenClawModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-fade-in">
-          <div className="bg-card border border-border rounded-xl shadow-xl w-full max-w-md mx-4 p-6 animate-scale-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+          <div className="glass border border-border/50 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 animate-scale-in">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <img src="/integrations/openclaw.svg" alt="OpenClaw" className="w-5 h-5" />
@@ -1670,12 +1680,12 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="p-5 rounded-2xl bg-card/50 border border-border/50 hover:bg-card hover:border-border transition-all duration-200 group">
-      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/15 transition-colors">
+    <div className="p-5 rounded-2xl bg-card/40 backdrop-blur-sm border border-border/40 hover:bg-card/70 hover:border-border/60 transition-all duration-300 group hover:-translate-y-0.5 hover:shadow-lg">
+      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/15 transition-all duration-300 group-hover:shadow-[0_0_20px_hsl(var(--primary)/0.1)]">
         <Icon className="w-5 h-5 text-primary" />
       </div>
       <h3 className="font-semibold text-foreground mb-1">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
+      <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
     </div>
   );
 }
@@ -1699,11 +1709,11 @@ function IntegrationButton({
         onClick={onClick}
         disabled={isConnecting}
         className={clsx(
-          "w-10 h-10 flex items-center justify-center rounded-xl border transition-all duration-150",
+          "w-10 h-10 flex items-center justify-center rounded-xl border transition-all duration-200",
           isConnectable
-            ? "bg-card border-border hover:border-foreground/20 cursor-pointer group-hover/int:scale-105"
-            : "bg-card/50 border-border/50 cursor-default opacity-50",
-          isConnected && "border-border",
+            ? "bg-card/80 backdrop-blur-sm border-border/60 hover:border-primary/20 hover:bg-card cursor-pointer group-hover/int:scale-110 hover:shadow-md"
+            : "bg-card/30 border-border/30 cursor-default opacity-40",
+          isConnected && "border-primary/20 shadow-sm",
         )}>
         {isConnecting ? (
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
